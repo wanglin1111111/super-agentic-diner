@@ -12,6 +12,7 @@ from sqlalchemy import (           # sqlalchemy：Python 里管数据库的库�
     DECIMAL,                       # DECIMAL：精确小数，对应 MySQL 的 DECIMAL(10,2)（总共10位、小数2位）
     SmallInteger,                  # SmallInteger：小整数，对应 MySQL 的 SMALLINT，省地方，存那种就几个值的字段
     Text,                          # Text：长文本，对应 MySQL 的 TEXT，存一大段话
+    JSON,                          # JSON：JSON 类型，存游戏场景/角色状态等结构化数据
 )
 
 from app.db.database import Base   # Base：所有表类的"地基"，定义的类都得继承它，库才知道这是个表
@@ -37,6 +38,10 @@ class User(Base):                  # 继承 Base，告诉 sqlalchemy："这是�
     nickname = Column(String(64), nullable=True)                         # 昵称。String(64) 表示最多 64 个字；nullable=True 表示这列可以留空（不填也行）
     balance = Column(DECIMAL(10, 2), nullable=False, default=Decimal("0.00"))  # 账上还剩多少钱。DECIMAL(10,2) 表示最多10位、小数2位（即最多 99999999.99）；nullable=False 表示必须填；default 表示新用户默认 0 元。金额一律用 DECIMAL，不能用 float，因为 float 存钱会算错（0.1+0.2≠0.3）
     taste_preference = Column(String(255), nullable=True)                # 口味喜好，比如 "不加糖"，可以不填
+
+    # ===== A2A 扩展字段 =====
+    evomap_user_id = Column(String(128), nullable=True, index=True)     # EvoMap 平台用户ID，用于积分对接
+    points = Column(Integer, nullable=False, default=100)               # 积分余额（EvoMap 积分缓存，默认赠送 100 积分）
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)  # 这条记录啥时候建的。default=datetime.utcnow 表示没手动指定时，自动填当前时间
     updated_at = Column(
         DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow  # 啥时候改过。onupdate=datetime.utcnow 表示每次改动这条记录，这列会自动刷新成当前时间
@@ -81,3 +86,68 @@ class CoffeeKB(Base):
     price = Column(DECIMAL(10, 2), nullable=False, default=Decimal("0.00"))  # 价格
     tags = Column(String(255), nullable=True)                            # 标签，比如 "果香,清甜,无奶"（后面靠模糊匹配搜它）
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)  # 啥时候加进来的
+
+
+# ============================================================
+# 【A2A 扩展】第四张表：游戏会话表（GameSession）
+# 记录每个用户在像素咖啡馆里的游戏状态：角色位置、场景、事件日志
+# ============================================================
+class GameSession(Base):
+    """游戏会话表：记录像素咖啡馆的角色与场景状态"""
+
+    __tablename__ = "game_session"
+
+    session_id = Column(String(64), primary_key=True)                    # 会话编号（UUID）
+    user_id = Column(BigInteger, ForeignKey("user.user_id"), nullable=False)  # 属于哪个用户
+    actors = Column(JSON, nullable=False, default=list)                  # 角色列表（位置、状态、动画）
+    scene = Column(JSON, nullable=True)                                  # 场景数据（家具、地板）
+    last_event = Column(String(64), nullable=True)                       # 最近一次事件类型
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (Index("idx_game_user", "user_id"),)
+
+
+# ============================================================
+# 【A2A 扩展】第五张表：积分流水表（PointsTransaction）
+# 记录每一笔积分变动（消费/充值/退款），用于积分审计与对账
+# ============================================================
+class PointsTransaction(Base):
+    """积分流水表：记录积分的增减明细"""
+
+    __tablename__ = "points_transaction"
+
+    tx_id = Column(_PK, primary_key=True, autoincrement=True)            # 流水编号
+    user_id = Column(BigInteger, ForeignKey("user.user_id"), nullable=False)  # 属于哪个用户
+    delta = Column(Integer, nullable=False)                              # 积分变动量（正=充值，负=消费）
+    balance_after = Column(Integer, nullable=False)                      # 变动后的余额（便于审计）
+    reason = Column(String(255), nullable=False)                         # 变动原因，如 "点单:美式咖啡"
+    order_id = Column(BigInteger, nullable=True)                         # 关联订单（点单消费时填）
+    source = Column(String(32), nullable=False, default="web")           # 来源：web / skill / evomap
+    evomap_tx_id = Column(String(128), nullable=True)                    # EvoMap 交易ID（对接时填）
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (Index("idx_points_user", "user_id", "created_at"),)
+
+
+# ============================================================
+# 【A2A 扩展】第六张表：Skill 调用日志表（SkillLog）
+# 记录其他 Agent（Claude Code / Codex 等）通过 Skill 点单的调用记录
+# ============================================================
+class SkillLog(Base):
+    """Skill 调用日志表：记录 Agent 通过 Skill 发起的操作"""
+
+    __tablename__ = "skill_log"
+
+    log_id = Column(_PK, primary_key=True, autoincrement=True)           # 日志编号
+    skill_id = Column(String(64), nullable=False)                        # 调用的 Skill 名，如 order_coffee
+    user_id = Column(BigInteger, ForeignKey("user.user_id"), nullable=False)  # 发起用户
+    agent_type = Column(String(32), nullable=False, default="unknown")   # Agent 类型：claude / codex / cursor
+    params = Column(JSON, nullable=True)                                 # 调用参数
+    result = Column(JSON, nullable=True)                                 # 返回结果
+    points_cost = Column(Integer, nullable=False, default=0)            # 消耗积分
+    success = Column(SmallInteger, nullable=False, default=1)            # 是否成功（1成功 / 0失败）
+    error_msg = Column(Text, nullable=True)                              # 失败原因
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (Index("idx_skill_user", "user_id", "created_at"),)

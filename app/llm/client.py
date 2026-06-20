@@ -187,8 +187,16 @@ def parse_intent(history, user_msg):
         except Exception:
             pass  # LLM 调用/解析失败，走兜底
 
-    # 兜底：LLM 不可用时只用最硬的词判断
+    # 兜底：LLM 不可用时用关键词 + 咖啡名匹配判断意图
+    # 1. 含下单硬词 → order
     if any(w in user_msg for w in _FALLBACK_ORDER_WORDS):
+        return {"intent": "order"}
+    # 2. 含"来杯/帮我/给我" + 咖啡相关词 → order（如"来杯美式"）
+    _ORDER_PATTERNS = ("来杯", "来个", "帮我来", "给我来", "我要", "点一杯", "点一杯")
+    _COFFEE_HINTS = ("咖啡", "拿铁", "美式", "冷萃", "玛奇朵", "摩卡", "卡布")
+    if any(p in user_msg for p in _ORDER_PATTERNS):
+        return {"intent": "order"}
+    if any(h in user_msg for h in _COFFEE_HINTS) and len(user_msg) <= 10:
         return {"intent": "order"}
     return {"intent": "chat"}
 

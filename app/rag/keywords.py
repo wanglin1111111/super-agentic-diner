@@ -77,9 +77,12 @@ def extract_keywords(text):
 
     【核心原则】负向词不参与召回，只用于过滤——这就是避开"否定词陷阱"的关键
     """
-    import jieba
-
-    tokens = [t for t in jieba.cut(text) if t.strip()]
+    try:
+        import jieba
+        tokens = [t for t in jieba.cut(text) if t.strip()]
+    except ImportError:
+        # jieba 未安装时，用简单字符分割降级
+        tokens = [text[i:i+2] for i in range(len(text)-1)] + [text]
     positive = []
     negative = []
 

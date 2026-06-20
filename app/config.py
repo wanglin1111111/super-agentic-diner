@@ -34,6 +34,22 @@ class Settings(BaseSettings):
     chat_history_rounds: int = 5
     chat_history_ttl: int = 1800
 
+    # ===== A2A 超级点单系统扩展配置 =====
+    # EvoMap 积分系统
+    evomap_api_key: str = ""
+    evomap_base_url: str = "https://api.evomap.ai"
+    evomap_mock: bool = True  # 无 key 时用本地模拟积分
+
+    # 游戏可视化
+    game_enabled: bool = True
+    game_grid_width: int = 24
+    game_grid_height: int = 16
+    game_tile_size: int = 32
+
+    # MCP / Skill 服务
+    mcp_enabled: bool = True
+    skill_order_cost: int = 10  # 每次点单消耗的积分
+
     @property
     def database_url(self) -> str:
         if self.db_mode == "sqlite":

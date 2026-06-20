@@ -3,240 +3,735 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>智能咖啡馆 · AI 店长</title>
+<title>A2A 超级点单系统 - 像素咖啡馆</title>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+<script src="/static/pixel-sprites.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body {
-    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
-    background: #2b2118;
-    color: #f5ebe0;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
-  header {
-    background: linear-gradient(135deg, #6f4e37, #4a3429);
-    padding: 14px 24px;
-    box-shadow: 0 2px 10px rgba(0,0,0,.4);
-    display: flex; align-items: center; justify-content: space-between;
-    flex-shrink: 0;
-  }
-  header h1 { font-size: 20px; font-weight: 600; }
-  header h1 span { margin-right: 8px; }
-  #modeTag {
-    font-size: 12px; padding: 4px 10px; border-radius: 12px;
-    background: rgba(255,255,255,.15);
-  }
-  #modeTag.llm { background: #4caf50; }
-  #modeTag.mock { background: #ff9800; }
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --wood-dark:#3D2817;--wood-mid:#5C3A22;--wood-light:#8B6914;
+  --cream:#F0E6D2;--gold:#F4C430;--copper:#CD7F32;
+  --bg:#1A1010;--panel:#241818;--accent:#E8A03C;--accent-glow:#FFD789;
+  --text:#F5E6D0;--text-dim:#A89070;--green:#7CB342;
+}
+html,body{font-family:'ZCOOL KuaiLe',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh;display:flex;image-rendering:pixelated}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0,rgba(0,0,0,0) 2px,rgba(0,0,0,.07) 3px,rgba(0,0,0,.07) 3px);pointer-events:none;z-index:9999;mix-blend-mode:multiply}
 
-  main {
-    flex: 1; display: flex; overflow: hidden;
-  }
-  /* 聊天区 */
-  #chat {
-    flex: 1; display: flex; flex-direction: column; min-width: 0;
-  }
-  #messages {
-    flex: 1; overflow-y: auto; padding: 20px;
-  }
-  .msg {
-    max-width: 75%; margin-bottom: 14px; padding: 12px 16px;
-    border-radius: 16px; line-height: 1.6; white-space: pre-wrap;
-    word-break: break-word; animation: fade .25s ease;
-  }
-  @keyframes fade { from{opacity:0; transform: translateY(8px);} to{opacity:1;} }
-  .msg.bot {
-    background: #3d2f24; align-self: flex-start;
-    border-bottom-left-radius: 4px;
-  }
-  .msg.user {
-    background: #c08552; color: #1a120b; align-self: flex-end; margin-left: auto;
-    border-bottom-right-radius: 4px;
-  }
-  .msg.sys { background: rgba(255,152,0,.15); border:1px solid #ff9800; font-size:13px; }
+/* === 左侧游戏区 === */
+#game-wrap{flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 40%,#2a1a10 0%,#0d0606 100%)}
+#game-wrap::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(232,160,60,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(232,160,60,.05) 1px,transparent 1px);background-size:32px 32px;pointer-events:none}
+#game-canvas{display:block;image-rendering:pixelated;filter:drop-shadow(0 0 30px rgba(232,160,60,.2))}
 
-  #quick {
-    display: flex; gap: 8px; padding: 8px 20px; flex-wrap: wrap; flex-shrink: 0;
-  }
-  #quick button {
-    background: #4a3429; color: #e8d5b7; border: 1px solid #6f4e37;
-    padding: 6px 12px; border-radius: 16px; font-size: 12px; cursor: pointer;
-    transition: all .15s;
-  }
-  #quick button:hover { background: #6f4e37; }
+/* HUD */
+.game-hud{position:absolute;top:18px;left:18px;right:18px;z-index:10;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none}
+.game-title{font-family:'Press Start 2P',monospace;font-size:15px;color:var(--accent-glow);text-shadow:2px 0 0 #6b3a10,0 2px 0 #6b3a10,2px 2px 0 #6b3a10,3px 3px 0 rgba(0,0,0,.5);letter-spacing:1px;line-height:1.6}
+.game-title .sub{display:block;font-size:9px;color:var(--copper);text-shadow:1px 1px 0 #000;margin-top:6px;font-family:'ZCOOL KuaiLe',sans-serif;letter-spacing:2px}
+.points-badge{background:linear-gradient(180deg,#2a1a10 0%,#1a0e08 100%);border:2px solid var(--gold);padding:7px 14px;font-family:'Press Start 2P',monospace;font-size:9px;color:var(--text-dim);pointer-events:auto;box-shadow:3px 3px 0 #000,inset 1px 1px 0 rgba(244,196,48,.2);position:relative}
+.points-badge::after{content:'';position:absolute;top:1px;left:1px;right:1px;height:40%;background:linear-gradient(180deg,rgba(255,255,255,.08),transparent);pointer-events:none}
+.points-badge .num{color:var(--gold);font-size:13px;text-shadow:0 0 6px rgba(244,196,48,.5);margin-left:5px}
 
-  #inputBar {
-    display: flex; gap: 10px; padding: 16px 20px; background: #221a13; flex-shrink: 0;
-  }
-  #msgInput {
-    flex: 1; background: #3d2f24; color: #f5ebe0; border: 1px solid #6f4e37;
-    border-radius: 12px; padding: 12px 16px; font-size: 14px; outline: none;
-  }
-  #msgInput:focus { border-color: #c08552; }
-  #sendBtn {
-    background: #c08552; color: #1a120b; border: none; border-radius: 12px;
-    padding: 0 24px; font-size: 14px; font-weight: 600; cursor: pointer;
-    transition: background .15s;
-  }
-  #sendBtn:hover { background: #d49a66; }
-  #sendBtn:disabled { opacity: .5; cursor: not-allowed; }
+/* === 右侧面板 === */
+#panel{width:420px;min-width:360px;height:100vh;background:linear-gradient(180deg,#2a1814 0%,#1a0e08 100%);border-left:4px solid var(--wood-mid);display:flex;flex-direction:column;position:relative;box-shadow:-8px 0 25px rgba(0,0,0,.5)}
+#panel::before{content:'';position:absolute;left:-4px;top:0;bottom:0;width:4px;background:linear-gradient(180deg,var(--gold) 0%,var(--copper) 50%,var(--wood-light) 100%)}
 
-  /* 侧栏 */
-  #side {
-    width: 300px; background: #221a13; padding: 20px; overflow-y: auto;
-    border-left: 1px solid #3d2f24; flex-shrink: 0;
-  }
-  #side h3 {
-    font-size: 13px; color: #c08552; text-transform: uppercase;
-    letter-spacing: 1px; margin-bottom: 12px; padding-bottom: 8px;
-    border-bottom: 1px solid #3d2f24;
-  }
-  .card {
-    background: #3d2f24; border-radius: 12px; padding: 14px; margin-bottom: 16px;
-  }
-  .card .row { display: flex; justify-content: space-between; margin: 4px 0; font-size: 14px; }
-  .card .row .val { color: #e8d5b7; font-weight: 600; }
-  .card .big { font-size: 26px; color: #d49a66; font-weight: 700; margin: 8px 0; }
-  .order-item {
-    background: #4a3429; border-radius: 8px; padding: 8px 10px; margin: 6px 0;
-    font-size: 13px;
-  }
-  .order-item .name { color: #e8d5b7; }
-  .order-item .meta { color: #8a7a6a; font-size: 11px; }
-  #emptyTip { color: #6a5a4a; font-size: 13px; text-align: center; padding: 16px 0; }
+.panel-header{padding:18px 20px 14px;background:linear-gradient(180deg,rgba(92,58,34,.3) 0%,transparent 100%);border-bottom:2px dashed rgba(139,105,20,.3);position:relative}
+.panel-header h2{font-family:'Press Start 2P',monospace;font-size:11px;color:var(--accent-glow);text-shadow:1px 1px 0 #000,2px 2px 0 rgba(0,0,0,.3);letter-spacing:1px;display:flex;align-items:center;gap:8px}
+.panel-header h2::before{content:'☕';font-size:14px;-webkit-text-fill-color:initial;filter:drop-shadow(0 0 2px rgba(232,160,60,.5))}
+.panel-header .sub{font-size:12px;color:var(--text-dim);margin-top:6px;letter-spacing:.5px}
 
-  /* 滚动条 */
-  ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-thumb { background: #4a3429; border-radius: 3px; }
-  .typing { color: #8a7a6a; font-style: italic; }
+#messages{flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+.msg{max-width:86%;padding:10px 14px;font-size:14px;line-height:1.65;word-break:break-word;position:relative;letter-spacing:.3px}
+.msg.user{align-self:flex-end;background:linear-gradient(180deg,#5C8FA8 0%,#4A7A96 100%);color:#fff;border:2px solid #2a4a5a;box-shadow:2px 3px 0 rgba(0,0,0,.4);border-radius:3px 3px 0 3px}
+.msg.bot{align-self:flex-start;background:linear-gradient(180deg,#3D3028 0%,#2D2018 100%);color:var(--text);border:2px solid #1a1008;box-shadow:2px 3px 0 rgba(0,0,0,.4);border-radius:3px 3px 3px 0}
+.msg.bot::before{content:'';position:absolute;left:-7px;top:10px;width:0;height:0;border-style:solid;border-width:5px 7px 5px 0;border-color:transparent #3D3028 transparent transparent;filter:drop-shadow(-1px 0 0 #1a1008)}
+.msg.sys{align-self:center;background:rgba(244,196,48,.08);color:var(--gold);font-size:10px;text-align:center;font-family:'Press Start 2P',monospace;padding:6px 14px;border:1px solid rgba(244,196,48,.3);letter-spacing:.5px}
+.msg .price{color:var(--gold);font-weight:bold;text-shadow:0 0 3px rgba(244,196,48,.4)}
+
+.input-area{padding:14px 18px 16px;border-top:2px dashed rgba(139,105,20,.3);background:rgba(36,24,24,.6)}
+.input-row{display:flex;gap:8px;align-items:stretch}
+#msg-input{flex:1;background:#0d0606;border:2px solid var(--wood-mid);color:var(--text);padding:10px 13px;font-size:14px;font-family:inherit;resize:none;min-height:44px;max-height:100px;outline:none;letter-spacing:.3px;transition:border-color .15s}
+#msg-input:focus{border-color:var(--gold);box-shadow:inset 0 0 0 1px rgba(244,196,48,.3)}
+#msg-input::placeholder{color:#5a4a3a}
+
+.btn{cursor:pointer;border:2px solid #000;transition:transform .08s,box-shadow .08s,filter .12s;user-select:none;display:flex;align-items:center;justify-content:center;font-family:'Press Start 2P',monospace;position:relative;overflow:hidden}
+.btn::after{content:'';position:absolute;top:1px;left:1px;right:1px;height:45%;background:linear-gradient(180deg,rgba(255,255,255,.15),transparent);pointer-events:none}
+.btn:hover{filter:brightness(1.15)}
+.btn:active{transform:translate(2px,2px)}
+
+#send-btn{background:linear-gradient(180deg,var(--gold) 0%,var(--copper) 100%);color:#1a0e08;padding:0 20px;box-shadow:3px 3px 0 #000;font-size:10px;letter-spacing:1px;min-height:44px}
+#send-btn:disabled{background:#3a3028;color:#5a4a3a;cursor:not-allowed;filter:none}
+#voice-btn{background:linear-gradient(180deg,#7C5BA8 0%,#5C3B88 100%);color:#fff;width:44px;min-height:44px;font-size:16px;box-shadow:3px 3px 0 #000}
+#voice-btn.recording{background:linear-gradient(180deg,#E85C5C 0%,#C83C3C 100%);animation:rec .7s infinite}
+@keyframes rec{0%,100%{box-shadow:3px 3px 0 #000}50%{box-shadow:1px 1px 0 #000,0 0 12px rgba(232,92,92,.6)}}
+
+.quick-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.qbtn{background:linear-gradient(180deg,#3D2818 0%,#2D1810 100%);color:var(--text-dim);border:1px solid var(--wood-mid);padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;transition:all .12s;letter-spacing:.5px}
+.qbtn:hover{background:linear-gradient(180deg,#5C3A22 0%,#3D2818 100%);color:var(--accent-glow);border-color:var(--gold);transform:translateY(-1px)}
+
+#messages::-webkit-scrollbar{width:7px}
+#messages::-webkit-scrollbar-track{background:#0d0606}
+#messages::-webkit-scrollbar-thumb{background:var(--wood-mid);border:1px solid #0d0606}
+#messages::-webkit-scrollbar-thumb:hover{background:var(--wood-light)}
+
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(15px);background:#0d0606;color:var(--gold);padding:10px 22px;font-family:'Press Start 2P',monospace;font-size:9px;border:2px solid var(--gold);box-shadow:3px 3px 0 #000;z-index:1000;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;letter-spacing:1px}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.conn{position:absolute;top:7px;right:18px;font-family:'Press Start 2P',monospace;font-size:6px;color:var(--text-dim);display:flex;align-items:center;gap:5px}
+.conn .dot{width:7px;height:7px;background:var(--green);box-shadow:0 0 5px var(--green)}
+.conn.off .dot{background:#e74c3c;box-shadow:0 0 5px #e74c3c;animation:blink .8s infinite}
+@keyframes blink{0%,50%{opacity:1}51%,100%{opacity:.3}}
 </style>
 </head>
 <body>
-<header>
-  <h1><span>☕</span>智能咖啡馆 · AI 店长</h1>
-  <span id="modeTag">加载中…</span>
-</header>
-<main>
-  <div id="chat">
-    <div id="messages"></div>
-    <div id="quick">
-      <button onclick="fill('店长，我想喝点清甜水果味的，但不要加牛奶，推荐一下。')">🍓 求推荐果味</button>
-      <button onclick="fill('有没有椰子味的？不要太苦。')">🥥 椰子味</button>
-      <button onclick="fill('就买你刚才推荐的那杯，从我余额里扣钱吧。')">💳 下单扣款</button>
-      <button onclick="fill('我想来点纯粹苦味的，不要拿铁。')">☕ 纯苦味</button>
-      <button onclick="clearChat()" style="margin-left:auto">🗑 清空对话</button>
+<div id="game-wrap">
+  <div class="game-hud">
+    <div class="game-title">A2A CAFE<span class="sub">像素咖啡馆 · 超级点单</span></div>
+    <div class="points-badge">PTS<span class="num" id="pts">--</span></div>
+  </div>
+  <div id="game-canvas"></div>
+</div>
+<div id="panel">
+  <div class="conn" id="conn"><span class="dot"></span>ONLINE</div>
+  <div class="panel-header"><h2>AI 店长</h2><div class="sub">发消息点单，角色同步走动 · 支持语音</div></div>
+  <div id="messages"></div>
+  <div class="input-area">
+    <div class="input-row">
+      <button id="voice-btn" class="btn" title="语音输入">🎤</button>
+      <textarea id="msg-input" placeholder="输入消息，如「来杯美式」..." rows="1"></textarea>
+      <button id="send-btn" class="btn">SEND</button>
     </div>
-    <div id="inputBar">
-      <input id="msgInput" placeholder="和店长说点什么…" onkeydown="if(event.key==='Enter')send()" />
-      <button id="sendBtn" onclick="send()">发送</button>
+    <div class="quick-actions">
+      <button class="qbtn" data-msg="你好，有什么推荐？">求推荐</button>
+      <button class="qbtn" data-msg="来一杯美式咖啡">点美式</button>
+      <button class="qbtn" data-msg="来一杯拿铁">点拿铁</button>
+      <button class="qbtn" data-msg="确认下单">确认下单</button>
+      <button class="qbtn" data-action="recharge">+充值</button>
     </div>
   </div>
-  <aside id="side">
-    <h3>👤 用户信息</h3>
-    <div class="card" id="userCard">
-      <div id="userName">加载中…</div>
-      <div class="big" id="userBalance">¥--</div>
-      <div class="row"><span>口味偏好</span><span class="val" id="userPref">--</span></div>
-    </div>
-    <h3>🧾 最近订单</h3>
-    <div id="orderList"><div id="emptyTip">还没有订单，聊起来吧~</div></div>
-  </aside>
-</main>
+</div>
+<div class="toast" id="toast"></div>
 
 <script>
-const USER_ID = 1;
-const $ = id => document.getElementById(id);
+// ============================================================
+const USER_ID=1,API_BASE=location.origin,WS_URL=`ws://${location.host}/ws/game/${USER_ID}`,TILE=32;
+let phaserGame=null;
+const actors={};
 
-function addMsg(text, role) {
-  const el = document.createElement('div');
-  el.className = 'msg ' + role;
-  el.textContent = text;
-  $('messages').appendChild(el);
-  $('messages').scrollTop = $('messages').scrollHeight;
-  return el;
-}
+// 场景布局
+const LAYOUT={
+  floor:{w:24,h:14},
+  wall:{h:3},
+  windows:[{x:4,y:1},{x:11,y:1},{x:18,y:1}],
+  counter:{x:8,y:5,w:8,h:1},
+  machine:{x:13,y:3,w:2,h:2},
+  register:{x:6,y:5,w:2,h:1},
+  tables:[{x:5,y:10},{x:10,y:10},{x:15,y:10}],
+  plants:[{x:21,y:3,type:'tall'},{x:2,y:8,type:'small'},{x:20,y:11,type:'medium'}],
+  lamps:[{x:5,y:0},{x:12,y:0},{x:19,y:0}],
+  blackboard:{x:2,y:3,w:3,h:2},
+  paintings:[{x:8,y:2},{x:16,y:2}],
+  door:{x:0,y:7},
+  // 关键位置（角色移动路径节点）
+  pos:{
+    entrance:{x:1,y:8},menu:{x:3,y:5},counter_front:{x:11,y:6},
+    machine_front:{x:13,y:5},seat1:{x:5,y:9},seat2:{x:10,y:9},seat3:{x:15,y:9},
+    waiter_home:{x:10,y:5},barista_home:{x:13,y:4},cashier_home:{x:6,y:5}
+  }
+};
 
-function fill(text){ $('msgInput').value = text; $('msgInput').focus(); }
+const {Game,Scene}=Phaser;
 
-async function send() {
-  const text = $('msgInput').value.trim();
-  if (!text) return;
-  $('msgInput').value = '';
-  addMsg(text, 'user');
-  const typing = addMsg('店长正在思考…', 'bot');
-  typing.classList.add('typing');
-  $('sendBtn').disabled = true;
-  try {
-    const r = await fetch('/chat', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({user_id: USER_ID, message: text})
-    });
-    const data = await r.json();
-    typing.classList.remove('typing');
-    typing.textContent = data.reply;
-    if (data.order_id) {
-      addMsg('✅ 已生成订单 #' + data.order_id, 'sys');
+// ============================================================
+// 像素咖啡馆场景（精致渲染）
+// ============================================================
+class CafeScene extends Scene{
+  constructor(){super('cafe')}
+  create(){
+    const W=LAYOUT.floor.w*TILE,H=LAYOUT.floor.h*TILE;
+    this.steamTimers=[];
+
+    // === 1. 木地板（温暖橡木色 + 纹理）===
+    this.drawFloor();
+
+    // === 2. 墙壁（奶油色 + 壁纸花纹 + 踢脚线）===
+    this.drawWalls();
+
+    // === 3. 窗户（夜空 + 月亮 + 星星）===
+    for(const w of LAYOUT.windows) this.drawWindow(w.x,w.y);
+
+    // === 4. 黑板菜单 ===
+    this.drawBlackboard(LAYOUT.blackboard);
+
+    // === 5. 壁画装饰 ===
+    for(const p of LAYOUT.paintings) this.drawPainting(p.x,p.y);
+
+    // === 6. 吊灯（带光锥）===
+    for(const l of LAYOUT.lamps) this.drawLamp(l.x,l.y);
+
+    // === 7. 吧台（胡桃木 + 大理石台面）===
+    this.drawCounter(LAYOUT.counter);
+
+    // === 8. 咖啡机（精致 + 蒸汽）===
+    this.drawCoffeeMachine(LAYOUT.machine);
+
+    // === 9. 收银台 ===
+    this.drawRegister(LAYOUT.register);
+
+    // === 10. 桌椅 ===
+    for(const t of LAYOUT.tables) this.drawTable(t.x,t.y);
+
+    // === 11. 盆栽 ===
+    for(const p of LAYOUT.plants) this.drawPlant(p.x,p.y,p.type);
+
+    // === 12. 入口门 ===
+    this.drawDoor(LAYOUT.door.x,LAYOUT.door.y);
+
+    // === 13. 暖光叠加层 ===
+    this.drawAmbientLight();
+
+    // === 14. 氛围粒子（光尘）===
+    this.startDustParticles();
+
+    // 注册角色纹理
+    if(window.PixelSprites) PixelSprites.registerCharacterTextures(this);
+
+    // 欢迎文字
+    this.add.text(TILE*12,TILE*0.3,'★ PIXEL CAFE ★',{fontSize:'9px',fontFamily:'"Press Start 2P",monospace',color:'#FFD789',stroke:'#000',strokeThickness:3}).setOrigin(0.5).setDepth(50);
+  }
+
+  // --- 木地板 ---
+  drawFloor(){
+    const{w,h}=LAYOUT.floor;
+    for(let x=0;x<w;x++){
+      for(let y=0;y<h;y++){
+        const isLight=(x+y)%2===0;
+        const base=isLight?0xC9925A:0xB07A48;
+        this.add.rectangle(x*TILE+TILE/2,y*TILE+TILE/2,TILE,TILE,base);
+        // 木纹横线
+        this.add.rectangle(x*TILE+TILE/2,y*TILE+TILE*0.3,TILE-2,1,isLight?0xD4A06A:0xBB8856);
+        this.add.rectangle(x*TILE+TILE/2,y*TILE+TILE*0.7,TILE-2,1,isLight?0xB58550:0x9C7040);
+        // 木板缝隙（每3格一条竖线）
+        if(x%3===0) this.add.rectangle(x*TILE,y*TILE+TILE/2,1,TILE,0x8B5E30);
+        // 木节点（随机深色点）
+        if((x*7+y*13)%11===0) this.add.rectangle(x*TILE+TILE*0.6,y*TILE+TILE*0.5,3,2,0x8B5E30);
+      }
     }
-    refreshUser();
-    refreshOrders();
-  } catch (e) {
-    typing.textContent = '⚠️ 网络错误：' + e.message;
-    typing.classList.add('sys');
-  } finally {
-    $('sendBtn').disabled = false;
+  }
+
+  // --- 墙壁 ---
+  drawWalls(){
+    const w=LAYOUT.floor.w,wh=LAYOUT.wall.h;
+    // 壁纸底色（奶油色渐变）
+    for(let y=0;y<wh;y++){
+      const shade=y===0?0xE8D5B7:y===1?0xDDC9A8:0xD0BC98;
+      this.add.rectangle(w*TILE/2,y*TILE+TILE/2,w*TILE,TILE,shade);
+    }
+    // 壁纸花纹（竖条纹）
+    for(let x=0;x<w;x+=2){
+      this.add.rectangle(x*TILE+TILE,0,1,wh*TILE,0xC9B088);
+      this.add.rectangle(x*TILE+TILE+1,0,1,wh*TILE,0xF0E0C8);
+    }
+    // 踢脚线（深棕色）
+    this.add.rectangle(w*TILE/2,wh*TILE-3,w*TILE,6,0x5C3A22);
+    this.add.rectangle(w*TILE/2,wh*TILE-7,w*TILE,2,0x8B6914);
+    // 墙壁底边阴影
+    this.add.rectangle(w*TILE/2,wh*TILE,w*TILE,2,0x3D2817);
+  }
+
+  // --- 窗户（夜空）---
+  drawWindow(gx,gy){
+    const x=gx*TILE,y=gy*TILE;
+    // 窗框（深棕）
+    this.add.rectangle(x+TILE,y+TILE,TILE*2,TILE*2,0x5C3A22);
+    // 玻璃（夜空蓝）
+    this.add.rectangle(x+TILE,y+TILE,TILE*2-8,TILE*2-8,0x1A2A4A);
+    // 渐变天空
+    this.add.rectangle(x+TILE,y+TILE-6,TILE*2-12,8,0x2A3A5A);
+    this.add.rectangle(x+TILE,y+TILE+TILE-4,TILE*2-12,8,0x0A1A3A);
+    // 月亮
+    this.add.circle(x+TILE*0.6,y+TILE*0.7,5,0xFFF8DC);
+    this.add.circle(x+TILE*0.6-1,y+TILE*0.7-1,3,0xFFFFE0);
+    // 星星（闪烁）
+    const stars=[{x:x+TILE*1.2,y:y+TILE*0.5},{x:x+TILE*1.5,y:y+TILE*1.2},{x:x+TILE*0.8,y:y+TILE*1.4},{x:x+TILE*1.3,y:y+TILE*0.9}];
+    for(const s of stars){
+      const star=this.add.rectangle(s.x,s.y,2,2,0xFFFFFF);
+      this.tweens.add({targets:star,alpha:{from:1,to:0.3},duration:1500+Math.random()*1000,yoyo:true,repeat:-1});
+    }
+    // 窗户十字框
+    this.add.rectangle(x+TILE,y+TILE,2,TILE*2-8,0x5C3A22);
+    this.add.rectangle(x+TILE,y+TILE,TILE*2-8,2,0x5C3A22);
+    // 窗台
+    this.add.rectangle(x+TILE,y+TILE*2,TILE*2+4,4,0x8B6914);
+  }
+
+  // --- 黑板菜单 ---
+  drawBlackboard(b){
+    const x=b.x*TILE+(b.w*TILE)/2,y=b.y*TILE+(b.h*TILE)/2,w=b.w*TILE,h=b.h*TILE;
+    // 金色画框
+    this.add.rectangle(x,y,w+4,h+4,0xD4A017);
+    this.add.rectangle(x,y,w+4,h+4,0xB8860B).setStrokeStyle(2,0xFFD700);
+    // 黑板
+    this.add.rectangle(x,y,w-2,h-2,0x1A1A2E);
+    // 粉笔字
+    this.add.text(b.x*TILE+8,b.y*TILE+6,'★ MENU ★',{fontSize:'7px',fontFamily:'"Press Start 2P",monospace',color:'#FFD789'}).setOrigin(0,0);
+    this.add.text(b.x*TILE+8,b.y*TILE+20,'Americano',{fontSize:'7px',fontFamily:'monospace',color:'#FFFFFF'});
+    this.add.text(b.x*TILE+8,b.y*TILE+30,'Latte',{fontSize:'7px',fontFamily:'monospace',color:'#FFFFFF'});
+    this.add.text(b.x*TILE+8,b.y*TILE+40,'Cold Brew',{fontSize:'7px',fontFamily:'monospace',color:'#A5D6A7'});
+    // 粉尘效果
+    this.add.rectangle(x,y+h/2-2,w-4,1,0x2A2A3E);
+  }
+
+  // --- 壁画 ---
+  drawPainting(gx,gy){
+    const x=gx*TILE+TILE/2,y=gy*TILE+TILE/2;
+    // 金色画框
+    this.add.rectangle(x,y,24,20,0x8B6914);
+    this.add.rectangle(x,y,24,20,0xB8860B).setStrokeStyle(2,0xFFD700);
+    // 画面（咖啡杯抽象画）
+    this.add.rectangle(x,y,20,16,0xE8D5B7);
+    this.add.circle(x,y-2,5,0x5C3A22);  // 杯子
+    this.add.rectangle(x,y-2,10,6,0x5C3A22);
+    this.add.rectangle(x,y+3,8,2,0x3D2817);
+    this.add.text(x,y-2,'☕',{fontSize:'10px'}).setOrigin(0.5);
+  }
+
+  // --- 吊灯（带光锥）---
+  drawLamp(gx,gy){
+    const x=gx*TILE+TILE/2,y=gy*TILE;
+    // 灯绳
+    this.add.rectangle(x,y+4,1,8,0x3D2817);
+    // 灯罩（梯形：上窄下宽）
+    const g=this.add.graphics();
+    g.fillStyle(0xD4A017);
+    g.beginPath();
+    g.moveTo(x-4,y+12);g.lineTo(x+4,y+12);g.lineTo(x+6,y+20);g.lineTo(x-6,y+20);
+    g.closePath();g.fill();
+    // 灯罩高光
+    g.fillStyle(0xFFD700);
+    g.fillRect(x-3,y+13,6,2);
+    // 灯泡（亮黄）
+    const bulb=this.add.circle(x,y+22,3,0xFFEFA0);
+    bulb.setBlendMode(Phaser.BlendModes.ADD);
+    // 光晕
+    const glow=this.add.circle(x,y+24,18,0xFFD789,0.08);
+    glow.setBlendMode(Phaser.BlendModes.ADD);
+    // 光锥（半透明三角形向下扩散）
+    const cone=this.add.graphics();
+    cone.fillStyle(0xFFD789,0.06);
+    cone.beginPath();
+    cone.moveTo(x-5,y+24);cone.lineTo(x+5,y+24);cone.lineTo(x+30,y+TILE*5);cone.lineTo(x-30,y+TILE*5);
+    cone.closePath();cone.fill();
+    cone.setBlendMode(Phaser.BlendModes.ADD);
+    // 灯光脉动
+    this.tweens.add({targets:[glow,bulb],alpha:{from:0.08,to:0.15},duration:2000+Math.random()*1000,yoyo:true,repeat:-1});
+    this.tweens.add({targets:cone,alpha:{from:0.06,to:0.1},duration:2500,yoyo:true,repeat:-1});
+  }
+
+  // --- 吧台 ---
+  drawCounter(c){
+    const x=c.x*TILE+(c.w*TILE)/2,y=c.y*TILE+(c.h*TILE)/2,w=c.w*TILE,h=c.h*TILE;
+    // 吧台主体（胡桃木深色）
+    this.add.rectangle(x,y+TILE/2,w,h+TILE,0x5C3A22);
+    // 前面板竖条纹
+    for(let i=0;i<c.w;i++){
+      const px=c.x*TILE+i*TILE+TILE/2;
+      this.add.rectangle(px,y+TILE/2,1,h+TILE-4,0x3D2817);
+      this.add.rectangle(px-1,y+TILE/2,1,h+TILE-4,0x7A4F32);
+    }
+    // 大理石台面（浅色 + 纹理）
+    this.add.rectangle(x,y-TILE/2+4,w,8,0xF0E6D6);
+    this.add.rectangle(x,y-TILE/2+1,w,2,0xFFF8E8);  // 高光
+    this.add.rectangle(x,y-TILE/2+8,w,2,0xC9B898);  // 阴影
+    // 台面纹理
+    for(let i=0;i<3;i++){
+      this.add.rectangle(x-w/2+10+i*w/3.5,y-TILE/2+4,w/4,1,0xD9C9B0);
+    }
+    // 吧台底阴影
+    this.add.rectangle(x,y+h/2+TILE/2,w,3,0x2A1810);
+  }
+
+  // --- 咖啡机（精致 + 蒸汽）---
+  drawCoffeeMachine(m){
+    const x=m.x*TILE+(m.w*TILE)/2,y=m.y*TILE+(m.h*TILE)/2,w=m.w*TILE,h=m.h*TILE;
+    // 底座
+    this.add.rectangle(x,y+h/2-2,w,4,0x333333);
+    // 主体（银色金属）
+    this.add.rectangle(x,y,w-2,h-4,0xA0A0A0);
+    // 金属高光
+    this.add.rectangle(x,y-h/2+3,w-4,2,0xD0D0D0);
+    this.add.rectangle(x-w/2+3,y,2,h-6,0xC0C0C0);
+    // 铜色装饰条
+    this.add.rectangle(x,y-h/2+6,w-4,3,0xCD7F32);
+    this.add.rectangle(x,y-h/2+6,w-4,1,0xFFD700);
+    // 屏幕（LCD 绿）
+    this.add.rectangle(x,y-h/2+4,w-10,8,0x003322);
+    this.add.text(x,y-h/2+4,'9:30',{fontSize:'5px',fontFamily:'monospace',color:'#00FF88'}).setOrigin(0.5);
+    // 按钮
+    this.add.rectangle(x-w/4,y+h/4-2,4,4,0xE84040);
+    this.add.rectangle(x,y+h/4-2,4,4,0x40E840);
+    this.add.rectangle(x+w/4,y+h/4-2,4,4,0x4080E8);
+    // 出水口
+    this.add.rectangle(x,y+h/2-4,6,4,0x222222);
+    this.add.rectangle(x,y+h/2-2,4,2,0x444444);
+    // 咖啡杯（在出水口下）
+    this.add.rectangle(x,y+h/2+TILE*0.4,8,6,0xFFFEF0);
+    this.add.rectangle(x,y+h/2+TILE*0.4,6,4,0x4A2F1A);
+
+    // 蒸汽动画（持续上升的白雾）
+    const steamX=x+8,steamY=y-h/2;
+    const timer=this.time.addEvent({
+      delay:500,
+      callback:()=>{
+        const s=this.add.circle(steamX+Phaser.Math.Between(-4,4),steamY,3,0xFFFFFF,0.35);
+        s.setBlendMode(Phaser.BlendModes.SCREEN);
+        this.tweens.add({targets:s,y:steamY-35,alpha:0,scale:2.5,duration:1800,onComplete:()=>s.destroy()});
+      },
+      loop:true
+    });
+    this.steamTimers.push(timer);
+  }
+
+  // --- 收银台 ---
+  drawRegister(r){
+    const x=r.x*TILE+(r.w*TILE)/2,y=r.y*TILE+(r.h*TILE)/2;
+    // 木质底座
+    this.add.rectangle(x,y+TILE/2,r.w*TILE,r.h*TILE+TILE,0x6B4423);
+    this.add.rectangle(x,y+TILE/2-1,r.w*TILE,2,0x8B6914);
+    // 收银机
+    this.add.rectangle(x,y-2,16,14,0x2A2A2A);
+    this.add.rectangle(x,y-2,16,14,0x444444).setStrokeStyle(1,0x666666);
+    // 屏幕
+    this.add.rectangle(x,y-6,12,5,0x00FF88);
+    this.add.text(x,y-6,'$$',{fontSize:'5px',fontFamily:'monospace',color:'#003322'}).setOrigin(0.5);
+    // 按键
+    for(let i=0;i<3;i++) this.add.rectangle(x-5+i*5,y+2,3,3,0x666666);
+  }
+
+  // --- 桌椅 ---
+  drawTable(gx,gy){
+    const x=gx*TILE+TILE/2,y=gy*TILE+TILE/2;
+    // 椅子（背后）
+    this.add.rectangle(x,y+TILE-4,TILE-8,6,0x5C3A22);  // 椅背
+    this.add.rectangle(x-TILE/2+2,y,8,TILE-4,0x6B4423); // 左椅
+    this.add.rectangle(x+TILE/2-2,y,8,TILE-4,0x6B4423); // 右椅
+    // 圆桌（深色桌面）
+    this.add.ellipse(x,y,TILE-4,TILE-10,0x8B5E30);
+    this.add.ellipse(x,y-2,TILE-4,TILE-10,0xA87242);  // 桌面高光
+    this.add.ellipse(x,y-1,TILE-8,TILE-14,0xC99060);  // 内圈
+    // 桌腿
+    this.add.rectangle(x,y+TILE/2-4,3,8,0x5C3A22);
+    // 咖啡杯（桌上）
+    this.add.ellipse(x,y-3,8,5,0xFFFEF0);
+    this.add.ellipse(x,y-4,6,3,0x4A2F1A);
+    this.add.ellipse(x,y-5,5,2,0x6B4423);
+    // 蒸汽（小）
+    const cupX=x,cupY=y-8;
+    this.time.addEvent({delay:1200,callback:()=>{
+      const s=this.add.circle(cupX,cupY,2,0xFFFFFF,0.25);
+      s.setBlendMode(Phaser.BlendModes.SCREEN);
+      this.tweens.add({targets:s,y:cupY-15,alpha:0,duration:1200,onComplete:()=>s.destroy()});
+    },loop:true});
+  }
+
+  // --- 盆栽 ---
+  drawPlant(gx,gy,type){
+    const x=gx*TILE+TILE/2,y=gy*TILE+TILE/2;
+    // 花盆
+    const g=this.add.graphics();
+    g.fillStyle(0xA0522D);
+    g.fillRect(x-6,y+4,12,10);
+    g.fillStyle(0xCD7F32);
+    g.fillRect(x-7,y+2,14,4);
+    g.fillStyle(0x8B4513);
+    g.fillRect(x-6,y+12,12,2);
+
+    if(type==='tall'){
+      // 高大植物（多叶）
+      this.add.circle(x,y-4,6,0x2D6B4F);
+      this.add.circle(x-4,y-8,5,0x3A8B5F);
+      this.add.circle(x+4,y-8,5,0x3A8B5F);
+      this.add.circle(x,y-12,5,0x4DA870);
+      this.add.circle(x-5,y-2,4,0x2D6B4F);
+      this.add.circle(x+5,y-2,4,0x3A8B5F);
+      // 高光叶
+      this.add.circle(x-2,y-10,3,0x6BCC8F);
+    }else if(type==='medium'){
+      this.add.circle(x,y-4,6,0x3A8B5F);
+      this.add.circle(x-3,y-8,4,0x4DA870);
+      this.add.circle(x+3,y-8,4,0x4DA870);
+      this.add.circle(x,y-10,4,0x6BCC8F);
+    }else{
+      // 小型多肉
+      this.add.circle(x,y-2,5,0x4DA870);
+      this.add.circle(x-2,y-5,3,0x6BCC8F);
+      this.add.circle(x+2,y-5,3,0x6BCC8F);
+      this.add.circle(x,y-6,3,0x8FE8AF);
+    }
+  }
+
+  // --- 入口门 ---
+  drawDoor(gx,gy){
+    const x=gx*TILE,y=gy*TILE;
+    // 门框
+    this.add.rectangle(x+8,y+TILE,TILE,TILE*3,0x5C3A22);
+    this.add.rectangle(x+8,y+TILE,TILE-6,TILE*3-4,0x2A1810);
+    // 门板
+    this.add.rectangle(x+10,y+TILE,TILE-10,TILE*3-8,0x6B4423);
+    this.add.rectangle(x+10,y+TILE,TILE-10,TILE*3-8,0x8B5E30).setStrokeStyle(1,0x5C3A22);
+    // 门把手
+    this.add.rectangle(x+TILE-4,y+TILE,3,3,0xFFD700);
+    // 门牌
+    this.add.text(x+TILE/2+2,y-TILE+8,'IN',{fontSize:'7px',fontFamily:'"Press Start 2P",monospace',color:'#FFD789',stroke:'#000',strokeThickness:2}).setOrigin(0.5);
+    // 铃铛
+    this.add.circle(x+TILE/2+2,y-2,3,0xFFD700);
+    this.add.text(x+TILE/2+2,y-2,'🔔',{fontSize:'8px'}).setOrigin(0.5);
+  }
+
+  // --- 暖光叠加层 ---
+  drawAmbientLight(){
+    const W=LAYOUT.floor.w*TILE,H=LAYOUT.floor.h*TILE;
+    // 中央暖光
+    const light=this.add.circle(W/2,H/2+TILE*2,W*0.4,0xFFD789,0.06);
+    light.setBlendMode(Phaser.BlendModes.ADD);
+    // 四角暗角
+    const vignette=this.add.graphics();
+    vignette.fillStyle(0x000000,0.15);
+    vignette.fillRect(0,0,W,TILE*2);  // 顶部暗
+    vignette.fillStyle(0x000000,0.1);
+    vignette.fillRect(0,H-TILE*2,W,TILE*2);  // 底部暗
+  }
+
+  // --- 氛围光尘粒子 ---
+  startDustParticles(){
+    const W=LAYOUT.floor.w*TILE,H=LAYOUT.floor.h*TILE;
+    this.time.addEvent({
+      delay:300,
+      callback:()=>{
+        const d=this.add.circle(Phaser.Math.Between(0,W),H,1.5,0xFFD789,0.4);
+        d.setBlendMode(Phaser.BlendModes.ADD);
+        this.tweens.add({targets:d,y:Phaser.Math.Between(0,H),x:'+=20',alpha:0,duration:4000+Math.random()*2000,onComplete:()=>d.destroy()});
+      },
+      loop:true
+    });
   }
 }
 
-async function clearChat() {
-  await fetch('/history/' + USER_ID, {method: 'DELETE'});
-  $('messages').innerHTML = '';
-  addMsg('对话已清空，我们重新开始吧~ 您想喝点什么？', 'bot');
+function initGame(){
+  phaserGame=new Game({
+    type:Phaser.CANVAS,parent:'game-canvas',
+    width:LAYOUT.floor.w*TILE,height:LAYOUT.floor.h*TILE,
+    backgroundColor:'#1A1010',pixelArt:true,antialias:false,roundPixels:true,
+    scene:CafeScene,
+    scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},
+    render:{pixelArt:true,antialias:false,roundPixels:true}
+  });
 }
 
-async function refreshUser() {
-  try {
-    const r = await fetch('/user/' + USER_ID);
-    const d = await r.json();
-    $('userName').textContent = '👋 ' + (d.nickname || '顾客');
-    $('userBalance').textContent = '¥' + Number(d.balance).toFixed(2);
-    $('userPref').textContent = d.taste_preference || '无';
-  } catch(e) {}
+// ============================================================
+// 角色系统
+// ============================================================
+function spawnActor(data){
+  if(actors[data.actor_id]){updateActor(data.actor_id,data);return}
+  const scene=phaserGame.scene.getScene('cafe');
+  if(!scene)return;
+  const type=data.actor_type||'customer';
+  const cx=data.x*TILE+TILE/2,cy=data.y*TILE+TILE/2;
+
+  // 阴影
+  const shadow=scene.add.ellipse(cx,cy+16,20,6,0x000000,0.3);
+
+  // 精灵（使用注册的纹理）
+  const texKey=`char_${type}_front`;
+  let sprite;
+  if(scene.textures.exists(texKey)){
+    sprite=scene.add.image(cx,cy-8,texKey);
+    sprite.setOrigin(0.5,0.5);
+    sprite.setScale(2);  // 放大16x16纹理
+  }else{
+    // 降级：简单方块
+    const colors={customer:0x4A90D9,waiter:0xF4C430,barista:0xE8743C,cashier:0x81C784};
+    sprite=scene.add.rectangle(cx,cy-8,16,20,colors[type]||0x4A90D9);
+  }
+
+  // 名字标签
+  const label=scene.add.text(cx,cy-30,data.name||'',{fontSize:'7px',fontFamily:'"Press Start 2P",monospace',color:'#FFFFFF',backgroundColor:'#000000',padding:{x:4,y:2}}).setOrigin(0.5);
+  label.setDepth(10);
+
+  // 说话气泡
+  const bubble=scene.add.text(cx,cy-50,'',{fontSize:'10px',fontFamily:'"ZCOOL KuaiLe",sans-serif',color:'#1A1010',backgroundColor:'#FFD789',padding:{x:7,y:4},wordWrap:{width:160}}).setOrigin(0.5);
+  bubble.setVisible(false);bubble.setDepth(20);
+
+  actors[data.actor_id]={sprite,shadow,label,bubble,type,x:data.x,y:data.y,target:null,moving:false,walkFrame:0,walkTimer:0,name:data.name,animTime:0,currentAnim:'idle'};
 }
 
-async function refreshOrders() {
-  try {
-    const r = await fetch('/orders/' + USER_ID);
-    const orders = await r.json();
-    const list = $('orderList');
-    if (!orders.length) {
-      list.innerHTML = '<div id="emptyTip">还没有订单，聊起来吧~</div>';
-      return;
+function updateActor(actorId,data){
+  const a=actors[actorId];
+  if(!a){spawnActor({actor_id:actorId,...data});return}
+  const scene=phaserGame.scene.getScene('cafe');
+
+  if(data.target_x!==undefined&&data.target_y!==undefined){a.target={x:data.target_x,y:data.target_y};a.moving=true}
+
+  if(data.speech_bubble){
+    a.bubble.setText(data.speech_bubble);a.bubble.setVisible(true);
+    if(a.bubbleTimer)a.bubbleTimer.remove();
+    a.bubbleTimer=scene.time.delayedCall(3000,()=>a.bubble.setVisible(false));
+  }
+
+  if(data.animation&&data.animation!==a.currentAnim){
+    a.currentAnim=data.animation;
+    const scene=phaserGame.scene.getScene('cafe');
+    if(data.animation==='happy'&&scene){
+      // 开心撒花
+      for(let i=0;i<8;i++){
+        const p=scene.add.circle(a.sprite.x,a.sprite.y-10,2,[0xFFD789,0xE8A03C,0xFF6B9D][i%3]);
+        const ang=(Math.PI*2*i)/8;
+        scene.tweens.add({targets:p,x:a.sprite.x+Math.cos(ang)*25,y:a.sprite.y-15+Math.sin(ang)*12,alpha:0,duration:900,onComplete:()=>p.destroy()});
+      }
     }
-    list.innerHTML = orders.map(o =>
-      '<div class="order-item"><div class="name">☕ ' + o.coffee_name +
-      '</div><div class="meta">¥' + Number(o.amount).toFixed(2) +
-      ' · ' + o.created_at + ' · #' + o.order_id + '</div></div>'
-    ).join('');
-  } catch(e) {}
+    if(data.animation==='work'){
+      // 工作：橙色叠加
+      a.sprite.setTint(0xFFAA66);
+    }else if(data.animation==='idle'){
+      a.sprite.clearTint();
+    }
+  }
 }
 
-async function refreshMode() {
-  try {
-    const r = await fetch('/status');
-    const d = await r.json();
-    const tag = $('modeTag');
-    if (d.llm_active) { tag.textContent = '🟢 真实LLM'; tag.className = 'llm'; }
-    else { tag.textContent = '🟡 降级模式'; tag.className = 'mock'; }
-  } catch(e) {}
+// 游戏循环：角色平滑移动 + 走路动画
+function gameUpdateLoop(){
+  if(!phaserGame)return;
+  const scene=phaserGame.scene.getScene('cafe');
+  if(!scene||!scene.sys.isActive)return;
+  const now=Date.now();
+
+  for(const id in actors){
+    const a=actors[id];
+
+    if(!a.moving||!a.target){
+      // 待机浮动
+      if(a.sprite){
+        const idle=Math.sin(now/700)*1.5;
+        const baseY=a.y*TILE+TILE/2-8;
+        a.sprite.y=baseY+idle;
+        a.shadow.y=a.y*TILE+TILE/2+16;
+        a.label.y=a.y*TILE+TILE/2-30+idle;
+        if(a.bubble.visible)a.bubble.y=a.y*TILE+TILE/2-50+idle;
+      }
+      continue;
+    }
+
+    const tx=a.target.x*TILE+TILE/2;
+    const ty=a.target.y*TILE+TILE/2-8;
+    const dx=tx-a.sprite.x,dy=ty-a.sprite.y;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+
+    if(dist<2.5){
+      a.sprite.setPosition(tx,ty);
+      a.shadow.setPosition(tx,ty+24);
+      a.label.setPosition(tx,ty-22);
+      a.bubble.setPosition(tx,ty-42);
+      a.x=a.target.x;a.y=a.target.y;
+      a.moving=false;a.target=null;
+      // 恢复站立帧
+      const scene2=phaserGame.scene.getScene('cafe');
+      if(scene2&&scene2.textures.exists(`char_${a.type}_front`)&&a.sprite.setTexture)a.sprite.setTexture(`char_${a.type}_front`);
+    }else{
+      const speed=2.5;
+      const vx=(dx/dist)*speed,vy=(dy/dist)*speed;
+      const bounce=Math.abs(Math.sin(now/80))*3;
+      a.sprite.setPosition(a.sprite.x+vx,a.sprite.y+vy-bounce);
+      a.shadow.setPosition(a.sprite.x,a.sprite.y+24+bounce);
+      a.label.setPosition(a.sprite.x,a.sprite.y-22-bounce);
+      if(a.bubble.visible)a.bubble.setPosition(a.sprite.x,a.sprite.y-42-bounce);
+      // 朝向翻转
+      if(Math.abs(vx)>0.1)a.sprite.setScale(vx>0?2:-2,2);
+      // 走路帧切换
+      a.walkTimer++;
+      if(a.walkTimer>6){
+        a.walkTimer=0;
+        a.walkFrame=(a.walkFrame+1)%2;
+        const scene2=phaserGame.scene.getScene('cafe');
+        if(scene2&&scene2.textures.exists(`char_${a.type}_walk${a.walkFrame+1}`)&&a.sprite.setTexture){
+          a.sprite.setTexture(`char_${a.type}_walk${a.walkFrame+1}`);
+        }
+      }
+    }
+  }
+  requestAnimationFrame(gameUpdateLoop);
 }
 
+// ============================================================
+// WebSocket
+// ============================================================
+let ws=null;
+function connectWS(){
+  ws=new WebSocket(WS_URL);
+  const ce=document.getElementById('conn');
+  ws.onopen=()=>{addSysMsg('GAME CONNECTED');ce.classList.remove('off')};
+  ws.onmessage=(e)=>{try{handleGameEvent(JSON.parse(e.data))}catch(err){}};
+  ws.onclose=()=>{addSysMsg('RECONNECTING...');ce.classList.add('off');setTimeout(connectWS,5000)};
+}
+function handleGameEvent(ev){
+  const{type,actor_id,data}=ev;
+  if(type==='ACTOR_SPAWN')spawnActor(data);
+  else if(['ACTOR_MOVE','ACTOR_ANIMATE','ACTOR_SPEAK'].includes(type))updateActor(actor_id,data);
+}
+
+// ============================================================
+// 聊天
+// ============================================================
+const msgBox=document.getElementById('messages'),msgInput=document.getElementById('msg-input'),sendBtn=document.getElementById('send-btn');
+function addMsg(text,role){const d=document.createElement('div');d.className='msg '+role;d.innerHTML=text;msgBox.appendChild(d);msgBox.scrollTop=msgBox.scrollHeight}
+function addSysMsg(t){addMsg(t,'sys')}
+function showToast(t){const e=document.getElementById('toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2200)}
+
+async function sendMessage(text){
+  if(!text.trim())return;
+  addMsg(esc(text),'user');
+  msgInput.value='';msgInput.style.height='auto';sendBtn.disabled=true;
+  try{
+    const r=await fetch(`${API_BASE}/chat`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:USER_ID,message:text})});
+    const d=await r.json();
+    addMsg(fmt(d.reply),'bot');
+    if(d.order_id)addSysMsg(`ORDER #${d.order_id}`);
+    refreshPoints();
+  }catch(e){addMsg('ERR: '+esc(e.message),'sys')}
+  finally{sendBtn.disabled=false}
+}
+function fmt(t){return esc(t).replace(/¥([\d.]+)/g,'<span class="price">¥$1</span>')}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+sendBtn.addEventListener('click',()=>sendMessage(msgInput.value));
+msgInput.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage(msgInput.value)}});
+msgInput.addEventListener('input',()=>{msgInput.style.height='auto';msgInput.style.height=Math.min(msgInput.scrollHeight,100)+'px'});
+document.querySelectorAll('.qbtn').forEach(b=>b.addEventListener('click',()=>b.dataset.action==='recharge'?rechargePoints():sendMessage(b.dataset.msg)));
+
+// ============================================================
+// 积分
+// ============================================================
+async function refreshPoints(){try{const r=await fetch(`${API_BASE}/user/${USER_ID}/points`);const d=await r.json();document.getElementById('pts').textContent=d.points}catch(e){}}
+async function rechargePoints(){try{const r=await fetch(`${API_BASE}/user/${USER_ID}/points/recharge?amount=100`,{method:'POST'});const d=await r.json();if(d.success){showToast(`+100 PTS · ${d.points} TOTAL`);refreshPoints();addSysMsg('RECHARGED +100')}}catch(e){showToast('FAILED')}}
+
+// ============================================================
+// 语音
+// ============================================================
+const voiceBtn=document.getElementById('voice-btn');let recognition=null,isRec=false;
+function initVoice(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){voiceBtn.style.opacity=.4;return}
+  recognition=new SR();recognition.lang='zh-CN';recognition.continuous=false;recognition.interimResults=true;
+  recognition.onstart=()=>{isRec=true;voiceBtn.classList.add('recording');showToast('RECORDING...')};
+  recognition.onresult=e=>{let t='';for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;msgInput.value=t;msgInput.focus()};
+  recognition.onerror=e=>showToast('ERR: '+e.error);
+  recognition.onend=()=>{isRec=false;voiceBtn.classList.remove('recording')};
+}
+voiceBtn.addEventListener('click',()=>{if(!recognition){showToast('NOT SUPPORTED');return}isRec?recognition.stop():recognition.start()});
+
+// ============================================================
 // 初始化
-(async function init() {
-  addMsg('您好！我是咖啡馆 AI 店长 ☕\n\n告诉我您喜欢的口味，或者有什么忌口，我来为您推荐~\n（试试右侧的快捷按钮）', 'bot');
-  await Promise.all([refreshUser(), refreshOrders(), refreshMode()]);
-})();
+// ============================================================
+window.addEventListener('load',()=>{initGame();initVoice();connectWS();gameUpdateLoop();refreshPoints();addSysMsg('WELCOME TO A2A PIXEL CAFE');fetch(`${API_BASE}/api/v1/status`).then(r=>r.json()).then(s=>addSysMsg(`MODE:${s.evomap_mode} COST:${s.skill_order_cost}PTS`)).catch(()=>{})});
 </script>
 </body>
 </html>
